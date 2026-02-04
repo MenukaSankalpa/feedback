@@ -1,53 +1,76 @@
 import express from "express";
 import { db } from "../db.js";
+import auth from "../middleware/auth.js";
 
 const router = express.Router();
 
+// ---------------------------
 // Submit feedback
-router.post("/", (req, res) => {
-  const { rating, name, phone, message } = req.body;
+// ---------------------------
+router.post("/", auth, (req, res) => {
+  const { rating, name, email, phone, feedback } = req.body;
+
+  if (!rating)
+    return res.status(400).json({ message: "Rating is required" });
+
+  const sql =
+    "INSERT INTO feedback (rating, name, email, phone, feedback) VALUES (?,?,?,?,?)";
 
   db.query(
-    "INSERT INTO feedback (rating, name, phone, message) VALUES (?,?,?,?)",
-    [rating, name || null, phone || null, message || null],
-    () => res.json({ success: true })
+    sql,
+    [rating, name || null, email || null, phone || null, feedback || null],
+    (err) => {
+      if (err)
+        return res
+          .status(500)
+          .json({ message: "Database error", error: err });
+      res.json({ success: true, message: "Feedback submitted" });
+    }
   );
 });
 
-// Get records with filters
-router.get("/", (req, res) => {
+// ---------------------------
+// Get all feedback (with optional filters)
+// ---------------------------
+router.get("/", auth, (req, res) => {
   const { start, end, rating } = req.query;
 
-  let q = "SELECT * FROM feedback WHERE 1=1";
-  const v = [];
+  let sql = "SELECT * FROM feedback WHERE 1=1";
+  const values = [];
 
   if (rating && rating !== "all") {
-    q += " AND rating=?";
-    v.push(rating);
+    sql += " AND rating=?";
+    values.push(rating);
   }
 
   if (start && end) {
-    q += " AND DATE(created_at) BETWEEN ? AND ?";
-    v.push(start, end);
+    sql += " AND DATE(created_at) BETWEEN ? AND ?";
+    values.push(start, end);
   }
 
-  db.query(q, v, (err, data) => res.json(data));
+  db.query(sql, values, (err, data) => {
+    if (err) return res.status(500).json(err);
+    res.json(data);
+  });
 });
 
-// Dashboard cards
-router.get("/stats", (req, res) => {
+// ---------------------------
+// Dashboard stats (for cards)
+// ---------------------------
+router.get("/stats", auth, (req, res) => {
   const { start, end } = req.query;
 
-  db.query(
-    `
-    SELECT rating, COUNT(*) total
+  const sql = `
+    SELECT rating, COUNT(*) AS total
     FROM feedback
     WHERE DATE(created_at) BETWEEN ? AND ?
     GROUP BY rating
-    `,
-    [start, end],
-    (err, data) => res.json(data)
-  );
+  `;
+
+  db.query(sql, [start, end], (err, data) => {
+    if (err) return res.status(500).json(err);
+    res.json(data);
+  });
 });
 
 export default router;
