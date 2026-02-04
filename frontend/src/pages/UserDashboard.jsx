@@ -5,7 +5,7 @@ import FeedbackModal from "../components/FeedbackModal";
 
 export default function UserDashboard() {
   const [open, setOpen] = useState(false);
-  const [rating, setRating] = useState(null);
+  const [selectedRating, setSelectedRating] = useState(null);
 
   const ratings = [
     { id: 1, label: "Very Poor", color: "#dc2626" },
@@ -15,11 +15,48 @@ export default function UserDashboard() {
     { id: 5, label: "Excellent", color: "#16a34a" },
   ];
 
-  const submitRating = async () => {
-    await axios.post("http://localhost:5000/api/feedback", {
-      rating,
-    });
-    alert("Submitted!");
+  // ✅ Function to submit feedback (with all fields)
+  const submitFeedback = async (data) => {
+    try {
+      await axios.post(
+        "http://localhost:5000/api/feedback",
+        {
+          rating: selectedRating, // id of the rating clicked
+          name: data.name,
+          email: data.email,
+          phone: data.phone,
+          feedback: data.feedback,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+      alert("Feedback submitted successfully!");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to submit feedback");
+    }
+  };
+
+  // ✅ Function for ratings without feedback modal (Good/Excellent)
+  const submitRatingOnly = async (ratingId) => {
+    try {
+      await axios.post(
+        "http://localhost:5000/api/feedback",
+        { rating: ratingId },
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+      alert("Rating submitted!");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to submit rating");
+    }
   };
 
   return (
@@ -30,13 +67,14 @@ export default function UserDashboard() {
           label={r.label}
           color={r.color}
           onClick={() => {
-            setRating(r.id);
-            r.id <= 2 ? setOpen(true) : submitRating();
+            setSelectedRating(r.id);
+            r.id <= 2 ? setOpen(true) : submitRatingOnly(r.id); // Very Poor / Poor → open modal
           }}
         />
       ))}
 
-      <FeedbackModal open={open} setOpen={setOpen} submit={submitRating} />
+      {/* Feedback Modal */}
+      <FeedbackModal open={open} setOpen={setOpen} submit={submitFeedback} />
     </div>
   );
 }
